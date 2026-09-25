@@ -1,7 +1,8 @@
 --[[
-    UNIVERSAL PANEL - LIMPO
-    Botão 💢: mira na cabeça (sem tiro automático)
-    Você usa 2 dedos: um no 💢, outro no "Atirar" do jogo
+    PAINEL UNIVERSAL v6
+    Fly CORRIGIDO (joystick mobile OK + sem vai-e-vem)
+    Sem Auto-Parry / Auto-Block / Auto-Farm
+    Mobile-friendly
 ]]
 
 if _G.UniversalPanelLoaded then
@@ -11,52 +12,63 @@ if _G.UniversalPanelLoaded then
 end
 _G.UniversalPanelLoaded = true
 
-local Players          = game:GetService("Players")
-local RunService       = game:GetService("RunService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local TweenService     = game:GetService("TweenService")
-local CoreGui          = game:GetService("CoreGui")
-local HttpService      = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local HttpService = game:GetService("HttpService")
+local VirtualUser = game:GetService("VirtualUser")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local LocalPlayer = Players.LocalPlayer
+
 local function getGuiParent()
     local ok, result = pcall(function() return CoreGui end)
     if ok and result then return result end
     return LocalPlayer:WaitForChild("PlayerGui")
 end
+
 local IS_MOBILE = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
 local CONFIG = {
-    DefaultSpeed    = 16,
-    FlySpeedMin     = 20,
-    FlySpeedMax     = 300,
+    DefaultSpeed = 16,
+    FlySpeedMin = 20,
+    FlySpeedMax = 300,
     FlySpeedDefault = 100,
-    UI_Color        = Color3.fromRGB(12, 12, 14),
-    UI_Card         = Color3.fromRGB(22, 22, 25),
-    UI_Header       = Color3.fromRGB(8, 8, 10),
-    UI_Border       = Color3.fromRGB(38, 38, 42),
-    UI_Bar          = Color3.fromRGB(30, 30, 34),
-    UI_Accent       = Color3.fromRGB(220, 220, 230),
-    UI_Success      = Color3.fromRGB(70, 200, 120),
-    UI_Off          = Color3.fromRGB(45, 45, 50),
-    UI_Danger       = Color3.fromRGB(230, 60, 70),
-    UI_Text         = Color3.fromRGB(240, 240, 245),
-    UI_SubText      = Color3.fromRGB(150, 150, 160),
-    UI_FlyBtn       = Color3.fromRGB(200, 200, 210),
-    UI_FOV          = Color3.fromRGB(255, 255, 255),
-    UI_AimBtn       = Color3.fromRGB(15, 15, 15),
-    UI_AimBtnHold   = Color3.fromRGB(60, 60, 60),
+    UI_Color = Color3.fromRGB(12, 12, 14),
+    UI_Card = Color3.fromRGB(22, 22, 25),
+    UI_Header = Color3.fromRGB(8, 8, 10),
+    UI_Border = Color3.fromRGB(38, 38, 42),
+    UI_Bar = Color3.fromRGB(30, 30, 34),
+    UI_Accent = Color3.fromRGB(220, 220, 230),
+    UI_Success = Color3.fromRGB(70, 200, 120),
+    UI_Off = Color3.fromRGB(45, 45, 50),
+    UI_Danger = Color3.fromRGB(230, 60, 70),
+    UI_Text = Color3.fromRGB(240, 240, 245),
+    UI_SubText = Color3.fromRGB(150, 150, 160),
+    UI_FlyBtn = Color3.fromRGB(200, 200, 210),
+    UI_FOV = Color3.fromRGB(255, 255, 255),
+    UI_AimBtn = Color3.fromRGB(15, 15, 15),
+    UI_AimBtnHold = Color3.fromRGB(60, 60, 60),
 }
 
 local State = {
-    InfiniteJump = false, Noclip = false, Fly = false, ESP = false,
-    FlySpeed = CONFIG.FlySpeedDefault, WalkSpeed = CONFIG.DefaultSpeed,
+    InfiniteJump = false,
+    Noclip = false,
+    Fly = false,
+    ESP = false,
+    FlySpeed = CONFIG.FlySpeedDefault,
+    WalkSpeed = CONFIG.DefaultSpeed,
     LockWalkSpeed = false,
     AimEnabled = false,
     ShowFOV = false,
     FOV = 150,
     TeamCheck = false,
     AimBtnOpacity = 0.6,
+    AntiAFK = false,
+    AutoClicker = false,
+    AutoClickerCPS = 15,
 }
 
 local Connections = {}
@@ -85,7 +97,7 @@ local function getHumanoid()
 end
 
 -- ============================================================
--- SALVAMENTO
+-- SAVE
 -- ============================================================
 local SAVE_FILE = "UniversalPanelConfig.json"
 local function safeSaveToFile(data)
@@ -107,6 +119,7 @@ local function safeLoadFromFile()
     return nil
 end
 local savedConfig = safeLoadFromFile() or {}
+
 local function serializeUDim2(u) return {u.X.Scale, u.X.Offset, u.Y.Scale, u.Y.Offset} end
 local function deserializeUDim2(t)
     if not t then return nil end
@@ -131,7 +144,8 @@ local ToggleButton = create("TextButton", {
     Size = UDim2.fromOffset(56, 56),
     Position = deserializeUDim2(savedConfig.togglePos) or DEFAULT_TOGGLE_POS,
     BackgroundColor3 = Color3.fromRGB(20, 20, 24),
-    Text = "≡", TextSize = 28,
+    Text = "≡",
+    TextSize = 28,
     Font = Enum.Font.GothamBold,
     TextColor3 = CONFIG.UI_Text,
     AutoButtonColor = false,
@@ -176,7 +190,7 @@ create("TextLabel", {
     Size = UDim2.new(1, -100, 1, 0),
     Position = UDim2.new(0, 20, 0, 0),
     BackgroundTransparency = 1,
-    Text = "⚡  UNIVERSAL PANEL",
+    Text = "⚡ PAINEL UNIVERSAL",
     TextColor3 = CONFIG.UI_Text,
     TextSize = 18,
     Font = Enum.Font.GothamBold,
@@ -188,7 +202,8 @@ local CloseButton = create("TextButton", {
     Size = UDim2.fromOffset(40, 40),
     Position = UDim2.new(1, -50, 0.5, -20),
     BackgroundColor3 = CONFIG.UI_Danger,
-    Text = "✕", TextSize = 18,
+    Text = "✕",
+    TextSize = 18,
     Font = Enum.Font.GothamBold,
     TextColor3 = CONFIG.UI_Text,
     AutoButtonColor = false,
@@ -416,10 +431,8 @@ local function createButton(parent, label, color, callback)
     return btn
 end
 
-local enableESP, disableESP, startFly, stopFly, applyNoclip
-
 -- ============================================================
--- TRAVA DE VELOCIDADE
+-- SPEED LOCK
 -- ============================================================
 local speedLockConn
 local function startSpeedLock()
@@ -437,7 +450,7 @@ local function stopSpeedLock()
 end
 
 -- ============================================================
--- CÍRCULO FOV
+-- FOV CIRCLE
 -- ============================================================
 local FOVCircle = create("Frame", {
     Name = "FOVCircle",
@@ -453,14 +466,14 @@ corner(FOVCircle, UDim.new(1, 0))
 stroke(FOVCircle, CONFIG.UI_FOV, 2)
 
 -- ============================================================
--- CARDS BÁSICOS
+-- CARDS
 -- ============================================================
 local jumpCard = createCard("🦘 Pulo Infinito", "Pular continuamente no ar")
 createToggle(jumpCard, "Ativar Pulo Infinito", false, function(v)
     State.InfiniteJump = v
 end)
 
-local speedCard = createCard("🏃 Velocidade", "Ajusta a velocidade")
+local speedCard = createCard("🏃 Velocidade", "Ajustar a velocidade")
 local speedSlider = createSlider(speedCard, "Velocidade", 8, 200, CONFIG.DefaultSpeed, function(v)
     State.WalkSpeed = v
     local hum = getHumanoid()
@@ -470,25 +483,138 @@ createToggle(speedCard, "🔒 Travar Velocidade", false, function(v)
     State.LockWalkSpeed = v
     if v then startSpeedLock() else stopSpeedLock() end
 end)
-createButton(speedCard, "↺  Restaurar Padrão", Color3.fromRGB(35, 35, 40), function()
+createButton(speedCard, "↺ Restaurar Padrão", Color3.fromRGB(35, 35, 40), function()
     speedSlider.Set(CONFIG.DefaultSpeed)
     State.WalkSpeed = CONFIG.DefaultSpeed
     local hum = getHumanoid()
     if hum then hum.WalkSpeed = CONFIG.DefaultSpeed end
 end)
 
-local espCard = createCard("👁 ESP", "Nome + silhueta azul dos jogadores")
+local espCard = createCard("👁 ESP", "Nome + distância + silhueta azul")
 createToggle(espCard, "Ativar ESP", false, function(v)
     State.ESP = v
     if v then enableESP() else disableESP() end
 end)
 
-local noclipCard = createCard("🚪 Atravessar Paredes", "Atravessa objetos do mapa")
+local noclipCard = createCard("🚪 Atravessar Paredes", "Atravessar objetos do mapa")
 createToggle(noclipCard, "Ativar Noclip", false, function(v)
     State.Noclip = v
     applyNoclip(v)
 end)
 
+-- ============================================================
+-- CARD: TELEPORTAR
+-- ============================================================
+local tpCard = createCard("🌀 Teleportar", "Escolha um jogador e teleporte até ele")
+
+local tpButton = create("TextButton", {
+    Size = UDim2.new(1, 0, 0, 40),
+    BackgroundColor3 = Color3.fromRGB(35, 35, 40),
+    Text = "Selecionar Jogador ▼",
+    TextColor3 = CONFIG.UI_Text,
+    TextSize = 14,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = false,
+    LayoutOrder = 10,
+    Parent = tpCard,
+})
+corner(tpButton, UDim.new(0, 8))
+stroke(tpButton, CONFIG.UI_Border, 1)
+
+local tpListFrame = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 0),
+    AutomaticSize = Enum.AutomaticSize.Y,
+    BackgroundColor3 = Color3.fromRGB(18, 18, 20),
+    Visible = false,
+    LayoutOrder = 11,
+    Parent = tpCard,
+})
+corner(tpListFrame, UDim.new(0, 8))
+stroke(tpListFrame, CONFIG.UI_Border, 1)
+create("UIPadding", {
+    PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6),
+    PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6),
+    Parent = tpListFrame,
+})
+create("UIListLayout", {
+    Padding = UDim.new(0, 4),
+    SortOrder = Enum.SortOrder.LayoutOrder,
+    Parent = tpListFrame,
+})
+
+local selectedPlayer = nil
+local function refreshPlayerList()
+    for _, child in ipairs(tpListFrame:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            local btn = create("TextButton", {
+                Size = UDim2.new(1, 0, 0, 32),
+                BackgroundColor3 = Color3.fromRGB(30, 30, 34),
+                Text = plr.Name,
+                TextColor3 = CONFIG.UI_Text,
+                TextSize = 13,
+                Font = Enum.Font.GothamMedium,
+                AutoButtonColor = false,
+                Parent = tpListFrame,
+            })
+            corner(btn, UDim.new(0, 6))
+            btn.MouseButton1Click:Connect(function()
+                selectedPlayer = plr
+                tpButton.Text = "🎯 " .. plr.Name .. " ▼"
+                tpListFrame.Visible = false
+            end)
+        end
+    end
+end
+
+tpButton.MouseButton1Click:Connect(function()
+    tpListFrame.Visible = not tpListFrame.Visible
+    if tpListFrame.Visible then refreshPlayerList() end
+end)
+
+local tpGoBtn = create("TextButton", {
+    Size = UDim2.new(1, 0, 0, 40),
+    BackgroundColor3 = Color3.fromRGB(70, 130, 200),
+    Text = "🌀 Teleportar até o Jogador",
+    TextColor3 = CONFIG.UI_Text,
+    TextSize = 14,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = false,
+    LayoutOrder = 12,
+    Parent = tpCard,
+})
+corner(tpGoBtn, UDim.new(0, 8))
+
+tpGoBtn.MouseButton1Click:Connect(function()
+    if not selectedPlayer then
+        tpGoBtn.Text = "⚠ Selecione um jogador!"
+        task.delay(1.5, function() tpGoBtn.Text = "🌀 Teleportar até o Jogador" end)
+        return
+    end
+    local targetChar = selectedPlayer.Character
+    if not targetChar then
+        tpGoBtn.Text = "⚠ Jogador sem personagem!"
+        task.delay(1.5, function() tpGoBtn.Text = "🌀 Teleportar até o Jogador" end)
+        return
+    end
+    local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if targetHRP and myHRP then
+        myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 3)
+        tpGoBtn.Text = "✅ Teleportado!"
+        task.delay(1.2, function() tpGoBtn.Text = "🌀 Teleportar até o Jogador" end)
+    else
+        tpGoBtn.Text = "⚠ Sem HumanoidRootPart!"
+        task.delay(1.5, function() tpGoBtn.Text = "🌀 Teleportar até o Jogador" end)
+    end
+end)
+
+-- ============================================================
+-- CARD: FLY
+-- ============================================================
 local flyCard = createCard("✈ Voo", "Joystick = direção | ▲▼ = subir/descer")
 createToggle(flyCard, "Ativar Voo", false, function(v)
     State.Fly = v
@@ -499,7 +625,25 @@ createSlider(flyCard, "Velocidade de Voo", CONFIG.FlySpeedMin, CONFIG.FlySpeedMa
 end)
 
 -- ============================================================
--- BOTÃO 💢 FLUTUANTE
+-- CARD: UTILIDADES
+-- ============================================================
+local utilCard = createCard("🛠 Utilidades", "Anti-AFK | Auto-Clicker")
+
+createToggle(utilCard, "🛡 Anti-AFK", false, function(v)
+    State.AntiAFK = v
+end)
+
+createToggle(utilCard, "🖱 Auto-Clicker (mobile OK)", false, function(v)
+    State.AutoClicker = v
+    if v then startAutoClicker() else stopAutoClicker() end
+end)
+
+createSlider(utilCard, "Auto-Clicker CPS", 1, 50, 15, function(v)
+    State.AutoClickerCPS = v
+end)
+
+-- ============================================================
+-- CARD: AIM
 -- ============================================================
 local DEFAULT_AIMBTN_POS = UDim2.new(1, -140, 0.5, -30)
 
@@ -520,10 +664,17 @@ local AimButton = create("TextButton", {
 corner(AimButton, UDim.new(1, 0))
 stroke(AimButton, Color3.fromRGB(255, 255, 255), 2)
 
--- ============================================================
--- CARD AIM ASSIST
--- ============================================================
-local aimCard = createCard("🎯 Mira Assistida", "Segure o 💢 → mira gruda | Use outro dedo no Atirar do jogo")
+if savedConfig.aimBtnVisible ~= nil then
+    AimButton.Visible = savedConfig.aimBtnVisible
+end
+
+local aimCard = createCard("🎯 Mira Assistida", "Segure o 💢 → mira gruda")
+
+createToggle(aimCard, "Mostrar Botão 💢", true, function(v)
+    AimButton.Visible = v
+    savedConfig.aimBtnVisible = v
+    safeSaveToFile(savedConfig)
+end)
 
 createSlider(aimCard, "Opacidade do Botão 💢", 0.1, 1, State.AimBtnOpacity, function(v)
     State.AimBtnOpacity = v
@@ -595,7 +746,7 @@ stroke(aimSaveBtn, CONFIG.UI_Border, 1)
 local aimResetBtn = create("TextButton", {
     Size = UDim2.new(1, 0, 0, 40),
     BackgroundColor3 = Color3.fromRGB(35, 35, 40),
-    Text = "↺ Resetar Posição do Botão",
+    Text = "↺ Redefinir posição do botão",
     TextColor3 = CONFIG.UI_Text,
     TextSize = 14,
     Font = Enum.Font.GothamBold,
@@ -607,7 +758,7 @@ corner(aimResetBtn, UDim.new(0, 8))
 stroke(aimResetBtn, CONFIG.UI_Border, 1)
 
 -- ============================================================
--- LÓGICA DE MIRA
+-- AIM LOGIC
 -- ============================================================
 local aiming = false
 local currentTarget = nil
@@ -659,7 +810,7 @@ local function findBestTarget()
         if not part then continue end
         local dist = screenDistFromCenter(part.Position, cam)
         if dist < bestDist then
-            best = { player = plr, part = part, char = char, dist = dist }
+            best = {player = plr, part = part, char = char, dist = dist}
             bestDist = dist
         end
     end
@@ -690,9 +841,6 @@ local function setTargetHighlight(char)
     })
 end
 
--- ============================================================
--- INPUT DO BOTÃO 💢 (só mira)
--- ============================================================
 local aimBtnDragging = false
 local aimBtnDragStart, aimBtnStartPos
 local aimBtnMoveMode = false
@@ -700,19 +848,13 @@ local aimBtnMoveMode = false
 AimButton.InputBegan:Connect(function(input)
     if input.UserInputType ~= Enum.UserInputType.MouseButton1
     and input.UserInputType ~= Enum.UserInputType.Touch then return end
-
     aimBtnDragStart = input.Position
     aimBtnStartPos = AimButton.Position
-
     if aimBtnMoveMode then
         aimBtnDragging = true
         return
     end
-
-    if State.AimEnabled then
-        aiming = true
-    end
-
+    if State.AimEnabled then aiming = true end
     TweenService:Create(AimButton, TweenInfo.new(0.1), {
         BackgroundColor3 = CONFIG.UI_AimBtnHold
     }):Play()
@@ -733,12 +875,10 @@ end)
 AimButton.InputEnded:Connect(function(input)
     if input.UserInputType ~= Enum.UserInputType.MouseButton1
     and input.UserInputType ~= Enum.UserInputType.Touch then return end
-
     if aimBtnMoveMode then
         aimBtnDragging = false
         return
     end
-
     aiming = false
     currentTarget = nil
     clearTargetHighlight()
@@ -747,9 +887,6 @@ AimButton.InputEnded:Connect(function(input)
     }):Play()
 end)
 
--- ============================================================
--- LOOP DA MIRA
--- ============================================================
 RunService.RenderStepped:Connect(function(dt)
     if not State.AimEnabled or not aiming then
         if currentTarget then
@@ -758,10 +895,8 @@ RunService.RenderStepped:Connect(function(dt)
         end
         return
     end
-
     local cam = workspace.CurrentCamera
     if not cam then return end
-
     if currentTarget and isValidTarget(currentTarget) then
         local d = screenDistFromCenter(currentTarget.part.Position, cam)
         if d > State.FOV then
@@ -772,22 +907,17 @@ RunService.RenderStepped:Connect(function(dt)
         if currentTarget then clearTargetHighlight() end
         currentTarget = nil
     end
-
     if not currentTarget then
         currentTarget = findBestTarget()
         if currentTarget then setTargetHighlight(currentTarget.char) end
     end
-
     if not currentTarget then return end
-
     local targetPart = currentTarget.part
     if not targetPart or not targetPart.Parent then
         clearTargetHighlight()
         currentTarget = nil
         return
     end
-
-    -- Mira suave (sem tremer)
     local camPos = cam.CFrame.Position
     local dir = (targetPart.Position - camPos)
     if dir.Magnitude < 0.1 then return end
@@ -795,15 +925,12 @@ RunService.RenderStepped:Connect(function(dt)
     cam.CFrame = targetCF
 end)
 
--- ============================================================
--- CONTROLES MOVER 💢
--- ============================================================
 aimMoveBtn.MouseButton1Click:Connect(function()
     aimBtnMoveMode = not aimBtnMoveMode
     if aimBtnMoveMode then
         aimMoveBtn.Text = "🔒 Fixar Botão 💢"
         aimMoveBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-        aimMoveStatus.Text = "Mover 💢: 🎯 Livre — arraste"
+        aimMoveStatus.Text = "Mover 💢: 🎯 Livre"
         stroke(AimButton, Color3.fromRGB(120, 180, 255), 3)
     else
         aimMoveBtn.Text = "🎯 Ativar Modo Mover o Botão"
@@ -833,12 +960,12 @@ aimResetBtn.MouseButton1Click:Connect(function()
     savedConfig.aimBtnPos = nil
     safeSaveToFile(savedConfig)
     AimButton.Position = DEFAULT_AIMBTN_POS
-    aimResetBtn.Text = "↺ Resetado!"
-    task.delay(1, function() aimResetBtn.Text = "↺ Resetar Posição do Botão" end)
+    aimResetBtn.Text = "↺ Redefinido!"
+    task.delay(1, function() aimResetBtn.Text = "↺ Redefinir posição do botão" end)
 end)
 
 -- ============================================================
--- EDITAR BOTÕES DE VOO
+-- EDIT FLY CARD
 -- ============================================================
 local editCard = createCard("✏ Editar Botões de Voo", "Mova, salve e fixe os botões ▲▼")
 local editStatus = create("TextLabel", {
@@ -881,7 +1008,7 @@ stroke(saveBtn, CONFIG.UI_Border, 1)
 local resetBtn = create("TextButton", {
     Size = UDim2.new(1, 0, 0, 40),
     BackgroundColor3 = Color3.fromRGB(35, 35, 40),
-    Text = "↺ Resetar para Padrão",
+    Text = "↺ Redefinir para Padrão",
     TextColor3 = CONFIG.UI_Text,
     TextSize = 14,
     Font = Enum.Font.GothamBold,
@@ -893,7 +1020,7 @@ corner(resetBtn, UDim.new(0, 8))
 stroke(resetBtn, CONFIG.UI_Border, 1)
 
 -- ============================================================
--- MOVER ≡
+-- MOVE TOGGLE CARD
 -- ============================================================
 local toggleMoveCard = createCard("🔘 Mover Botão ≡", "Arraste o botão redondo")
 local toggleMoveStatus = create("TextLabel", {
@@ -936,7 +1063,7 @@ stroke(toggleSaveBtn, CONFIG.UI_Border, 1)
 local toggleResetBtn = create("TextButton", {
     Size = UDim2.new(1, 0, 0, 40),
     BackgroundColor3 = Color3.fromRGB(35, 35, 40),
-    Text = "↺ Resetar Posição do ≡",
+    Text = "↺ Redefinir posição do ≡",
     TextColor3 = CONFIG.UI_Text,
     TextSize = 14,
     Font = Enum.Font.GothamBold,
@@ -948,7 +1075,7 @@ corner(toggleResetBtn, UDim.new(0, 8))
 stroke(toggleResetBtn, CONFIG.UI_Border, 1)
 
 -- ============================================================
--- ABRIR/FECHAR
+-- OPEN/CLOSE
 -- ============================================================
 local uiOpen = false
 local function setUIOpen(open)
@@ -1005,9 +1132,9 @@ end)
 toggleMoveBtn.MouseButton1Click:Connect(function()
     toggleMoveMode = not toggleMoveMode
     if toggleMoveMode then
-        toggleMoveBtn.Text = "🔒 Fixar Botão ≡"
+        toggleMoveBtn.Text = "🔒 Fixar botão ≡"
         toggleMoveBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-        toggleMoveStatus.Text = "Modo: 🎯 Livre — arraste o ≡"
+        toggleMoveStatus.Text = "Modo: 🎯 Livre"
         stroke(ToggleButton, Color3.fromRGB(120, 180, 255), 3)
     else
         toggleMoveBtn.Text = "🎯 Ativar Modo Mover o ≡"
@@ -1037,8 +1164,8 @@ toggleResetBtn.MouseButton1Click:Connect(function()
     savedConfig.togglePos = nil
     safeSaveToFile(savedConfig)
     ToggleButton.Position = DEFAULT_TOGGLE_POS
-    toggleResetBtn.Text = "↺ Resetado!"
-    task.delay(1, function() toggleResetBtn.Text = "↺ Resetar Posição do ≡" end)
+    toggleResetBtn.Text = "↺ Redefinido!"
+    task.delay(1, function() toggleResetBtn.Text = "↺ Redefinir posição do ≡" end)
 end)
 
 CloseButton.MouseButton1Click:Connect(function() setUIOpen(false) end)
@@ -1089,6 +1216,9 @@ addConn(UserInputService.JumpRequest:Connect(function()
     if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
 end))
 
+-- ============================================================
+-- NOCLIP
+-- ============================================================
 local noclipConn
 function applyNoclip(enabled)
     if enabled then
@@ -1122,10 +1252,13 @@ function applyNoclip(enabled)
     end
 end
 
+-- ============================================================
+-- ESP
+-- ============================================================
 local ESPFolder
 local espConnections = {}
 local ESP_BLUE_FILL = Color3.fromRGB(60, 140, 255)
-local ESP_BLUE_OUT  = Color3.fromRGB(160, 210, 255)
+local ESP_BLUE_OUT = Color3.fromRGB(160, 210, 255)
 
 function enableESP()
     if ESPFolder then ESPFolder:Destroy() end
@@ -1136,11 +1269,12 @@ function enableESP()
         if not head then return end
         local billboard = create("BillboardGui", {
             Name = "ESP_Billboard",
-            Size = UDim2.fromOffset(200, 40),
+            Size = UDim2.fromOffset(220, 44),
             StudsOffset = Vector3.new(0, 3.2, 0),
-            AlwaysOnTop = true, Parent = head,
+            AlwaysOnTop = true,
+            Parent = head,
         })
-        create("TextLabel", {
+        local label = create("TextLabel", {
             Size = UDim2.fromScale(1, 1),
             BackgroundTransparency = 1,
             Text = plr.Name,
@@ -1160,6 +1294,19 @@ function enableESP()
             DepthMode = Enum.HighlightDepthMode.AlwaysOnTop,
             Parent = char,
         })
+        local distConn
+        distConn = RunService.RenderStepped:Connect(function()
+            if not State.ESP or not char.Parent or not head.Parent then
+                if distConn then distConn:Disconnect() end
+                return
+            end
+            local myChar = LocalPlayer.Character
+            local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            if not myHRP then return end
+            local dist = (myHRP.Position - head.Position).Magnitude
+            label.Text = string.format("%s  [%.0f studs]", plr.Name, dist)
+        end)
+        table.insert(espConnections, distConn)
     end
     local function setupFor(plr)
         if plr == LocalPlayer then return end
@@ -1190,7 +1337,7 @@ function disableESP()
 end
 
 -- ============================================================
--- FLY
+-- FLY (v6 - joystick mobile funciona + sem vai-e-vem)
 -- ============================================================
 local flyConn
 local flyKeys = {W=false, A=false, S=false, D=false, Up=false, Down=false}
@@ -1199,7 +1346,7 @@ local flyBtnUp, flyBtnDown
 local flySavedCollision = {}
 local moveMode = false
 
-local DEFAULT_UP_POS   = UDim2.new(1, -110, 0.5, -90)
+local DEFAULT_UP_POS = UDim2.new(1, -110, 0.5, -90)
 local DEFAULT_DOWN_POS = UDim2.new(1, -110, 0.5, 10)
 
 local function applySavedPositions()
@@ -1290,7 +1437,7 @@ local function buildMobileFlyUI()
     })
     corner(flyBtnDown, UDim.new(1, 0))
     stroke(flyBtnDown, Color3.fromRGB(120, 120, 130), 2)
-    makeDraggable(flyBtnUp,   "Up")
+    makeDraggable(flyBtnUp, "Up")
     makeDraggable(flyBtnDown, "Down")
     applySavedPositions()
     return container
@@ -1301,9 +1448,9 @@ if IS_MOBILE then mobileFlyUI = buildMobileFlyUI() end
 modeBtn.MouseButton1Click:Connect(function()
     moveMode = not moveMode
     if moveMode then
-        modeBtn.Text = "🔒 Fixar Posição"
+        modeBtn.Text = "🔒 Fixar posição"
         modeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-        editStatus.Text = "Modo: 🎯 Livre — arraste os botões ▲▼"
+        editStatus.Text = "Modo: 🎯 Livre"
     else
         modeBtn.Text = "🎯 Ativar Modo Mover"
         modeBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
@@ -1337,8 +1484,8 @@ resetBtn.MouseButton1Click:Connect(function()
     safeSaveToFile(savedConfig)
     if flyBtnUp then flyBtnUp.Position = DEFAULT_UP_POS end
     if flyBtnDown then flyBtnDown.Position = DEFAULT_DOWN_POS end
-    resetBtn.Text = "↺ Resetado!"
-    task.delay(1, function() resetBtn.Text = "↺ Resetar para Padrão" end)
+    resetBtn.Text = "↺ Redefinido!"
+    task.delay(1, function() resetBtn.Text = "↺ Redefinir para Padrão" end)
 end)
 
 local function setCharacterCollision(char, enabled)
@@ -1392,43 +1539,81 @@ function startFly()
     hrp.AssemblyLinearVelocity = Vector3.zero
     hrp.AssemblyAngularVelocity = Vector3.zero
     setCharacterCollision(LocalPlayer.Character, false)
+
     if mobileFlyUI then mobileFlyUI.Visible = true end
+
+    -- Variável para suavizar o MoveDirection (evita tremor/vai-e-vem)
+    local smoothMove = Vector3.zero
+
     flyConn = RunService.RenderStepped:Connect(function(dt)
         if not State.Fly then return end
+
         local cHum, cHrp = getHumanoid()
         if not cHum or not cHrp or cHum.Health <= 0 then return end
+
         local cCam = workspace.CurrentCamera
         if not cCam then return end
+
         local camCF = cCam.CFrame
-        local look, right = camCF.LookVector, camCF.RightVector
+        local look = camCF.LookVector
+        local right = camCF.RightVector
+
         local flatLook = Vector3.new(look.X, 0, look.Z)
         if flatLook.Magnitude < 0.01 then flatLook = Vector3.new(0, 0, -1) end
         flatLook = flatLook.Unit
+
         local flatRight = Vector3.new(right.X, 0, right.Z)
         if flatRight.Magnitude < 0.01 then flatRight = Vector3.new(1, 0, 0) end
         flatRight = flatRight.Unit
-        local moveDir = Vector3.zero
+
+        -- Direção vinda das teclas (PC)
+        local keyDir = Vector3.zero
+        if flyKeys.W then keyDir += flatLook end
+        if flyKeys.S then keyDir -= flatLook end
+        if flyKeys.A then keyDir -= flatRight end
+        if flyKeys.D then keyDir += flatRight end
+
+        -- Direção vinda do joystick mobile (MoveDirection)
         local nativeDir = cHum.MoveDirection
         local flatNative = Vector3.new(nativeDir.X, 0, nativeDir.Z)
+
+        local moveDir
         if flatNative.Magnitude > 0.05 then
-            moveDir = flatNative.Unit
+            -- Joystick mobile está sendo usado
+            -- Projeta o MoveDirection no referencial da câmera (frente/trás/lado)
+            local normalized = flatNative.Unit
+            local dotF = normalized:Dot(flatLook)
+            local dotR = normalized:Dot(flatRight)
+            moveDir = flatLook * dotF + flatRight * dotR
+            if moveDir.Magnitude > 1 then moveDir = moveDir.Unit end
+        elseif keyDir.Magnitude > 0 then
+            moveDir = keyDir.Unit
         else
-            if flyKeys.W then moveDir += flatLook end
-            if flyKeys.S then moveDir -= flatLook end
-            if flyKeys.A then moveDir -= flatRight end
-            if flyKeys.D then moveDir += flatRight end
-            if moveDir.Magnitude > 0 then moveDir = moveDir.Unit end
+            moveDir = Vector3.zero
         end
+
+        -- Suaviza o movimento (evita tremor/vai-e-vem)
+        smoothMove = smoothMove:Lerp(moveDir, math.clamp(dt * 10, 0, 1))
+        if smoothMove.Magnitude < 0.05 then
+            smoothMove = Vector3.zero
+        end
+
         local vertical = 0
         if flyKeys.Up then vertical += 1 end
         if flyKeys.Down then vertical -= 1 end
-        local delta = Vector3.zero
-        delta += moveDir * State.FlySpeed * dt
-        delta += Vector3.new(0, vertical * State.FlySpeed * dt, 0)
-        local newPos = cHrp.Position + delta
-        cHrp.CFrame = CFrame.new(newPos, newPos + flatLook)
+
+        -- Zera velocidade ANTES de mover
         cHrp.AssemblyLinearVelocity = Vector3.zero
         cHrp.AssemblyAngularVelocity = Vector3.zero
+
+        -- Aplica movimento
+        local delta = smoothMove * State.FlySpeed * dt
+        delta += Vector3.new(0, vertical * State.FlySpeed * dt, 0)
+
+        if delta.Magnitude > 0 then
+            local newPos = cHrp.Position + delta
+            cHrp.CFrame = CFrame.new(newPos) * CFrame.Angles(0, math.atan2(-flatLook.X, -flatLook.Z), 0)
+        end
     end)
 end
 
@@ -1468,4 +1653,69 @@ addConn(UserInputService.InputBegan:Connect(function(input, gpe)
     if input.KeyCode == Enum.KeyCode.K then setUIOpen(not uiOpen) end
 end))
 
-print("[Universal Panel] Carregado! 💢 mira na cabeça (sem tremer).")
+-- ============================================================
+-- ANTI-AFK
+-- ============================================================
+LocalPlayer.Idled:Connect(function()
+    if not State.AntiAFK then return end
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
+-- ============================================================
+-- AUTO-CLICKER MOBILE
+-- ============================================================
+local autoClickerRunning = false
+local autoClickerThread = nil
+
+function startAutoClicker()
+    if autoClickerRunning then return end
+    autoClickerRunning = true
+    autoClickerThread = task.spawn(function()
+        while State.AutoClicker and autoClickerRunning do
+            local cam = workspace.CurrentCamera
+            if cam then
+                local center = cam.ViewportSize / 2
+                pcall(function()
+                    VirtualInputManager:SendMouseButtonEvent(
+                        math.floor(center.X), math.floor(center.Y),
+                        0, true, game, 0
+                    )
+                end)
+                task.wait(0.01)
+                pcall(function()
+                    VirtualInputManager:SendMouseButtonEvent(
+                        math.floor(center.X), math.floor(center.Y),
+                        0, false, game, 0
+                    )
+                end)
+            else
+                pcall(function()
+                    VirtualUser:CaptureController()
+                    VirtualUser:Button1Down(Vector2.new())
+                    task.wait(0.01)
+                    VirtualUser:Button1Up(Vector2.new())
+                end)
+            end
+            task.wait(1 / math.max(State.AutoClickerCPS, 1))
+        end
+    end)
+end
+
+function stopAutoClicker()
+    autoClickerRunning = false
+    if autoClickerThread then
+        pcall(function() task.cancel(autoClickerThread) end)
+        autoClickerThread = nil
+    end
+end
+
+addConn(UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.R then
+        State.AutoClicker = not State.AutoClicker
+        if State.AutoClicker then startAutoClicker() else stopAutoClicker() end
+    end
+end))
+
+print("[Painel Universal v6] Carregado! Fly com joystick mobile OK.")
